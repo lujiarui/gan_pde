@@ -2,11 +2,16 @@ from tqdm import tqdm
 import torch
 import torch.optim as optim
 
-from utils import sample_xr_xb, sample_xr_xb_xa, plot_func, plot_moving
+from utils import sample_xr_xb, sample_xr_xb_xa, sample_lin, plot_func, plot_moving
 from nn import PrimalNet, AdverNet
 
 
-def train(params, g, loss_func, device, log_every=100, requires_time=False):
+def train(params, g, loss_func, device, log_every=100, requires_time=False, valid=False, model_path=None):
+    if valid:
+        primal_net = PrimalNet(in_dim=params['dim'], use_elu=params['use elu'])
+        primal_net.load_state_dict(torch.load(model_path)['primal net'])
+        plot_func(g, primal_net, 2, params['left boundary'], params['right boundary'])
+
     primal_net = PrimalNet(in_dim=params['dim'], use_elu=params['use elu']).to(device)
     adv_net = AdverNet(in_dim=params['dim']).to(device)
     primal_net.train()
@@ -20,12 +25,11 @@ def train(params, g, loss_func, device, log_every=100, requires_time=False):
     
     moving_loss = []
     moving_err  = []
-    
+    test_points = sample_lin(params['left boundary'], params['right boundary'], params['dim']).to(device)
     for step in tqdm(range(params['n_iter'])):
         # do something
         opt_primal.zero_grad()
         opt_adv.zero_grad()
-
         
         if requires_time:
             xr, xr_t0, xr_T, xb, xa = sample_xr_xb_xa(params['Nr'], params['Nb'], params['Na'], 
@@ -52,21 +56,21 @@ def train(params, g, loss_func, device, log_every=100, requires_time=False):
         for _ in range(params['K_adv']):
             opt_adv.step()
         
-        err = torch.sum(torch.abs(primal_net(xr).detach() - g(xr))) + \
-                torch.sum(torch.abs(primal_net(xb).detach() - g(xb)))
-        moving_err.append(err.item())
+        rel_err = torch.abs( primal_net(test_points).detach().squeeze() / g(test_points) - 1)
+        rel_err = torch.mean(rel_err)
+        moving_err.append(rel_err.item())
         
         if step % log_every == 0:
-            print('\nTrain | GAN loss: {} | Error: {}\n'.format(loss.item(), err.item()))
+            print('\nTrain | GAN loss: {} | Relative Error: {}\n'.format(loss.item(), rel_err.item()))
 
     print('Training terminates normally.')
     
     plot_moving(moving_err, 'error')
     plot_moving(moving_loss, 'loss')
+    plot_func(g, primal_net, params['dim'], params['left boundary'], params['right boundary'])
 
     torch.save({
             'primal net': primal_net.state_dict(),
             'adversial net': adv_net.state_dict(),
             },'WAN_{}_{}.pt'.format(params['name'], params['dim']))
-    
     return

@@ -28,7 +28,7 @@ PARAMS = {
     'dim': 2,
     'left boundary': 0,
     'right boundary': 1,
-    'K_primal': 2,
+    'K_primal': 1,
     'K_adv': 1,
     'lr_primal': 0.015,
     'lr_adv': 0.04,
@@ -36,7 +36,7 @@ PARAMS = {
     'Nb': 400,
     'alpha': None,
     'use elu': True,
-    'n_iter': 100000,
+    'n_iter': 5000,
 }
 PARAMS['alpha'] = PARAMS['Nb'] * 10000
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -60,7 +60,7 @@ def g(x):
     """ 
     :g Dirichlet boundary / ground truth weak solution
     """
-    return (0.5 - torch.abs(x - 0.5))**2
+    return ((0.5 - torch.abs(x - 0.5))**2)[:, 0]
 
 def loss_all(xr: torch.Tensor, xb: torch.Tensor, u_theta, phi_eta, alpha, device):
     """
@@ -79,15 +79,15 @@ def loss_all(xr: torch.Tensor, xb: torch.Tensor, u_theta, phi_eta, alpha, device
     xr = Variable(xr, requires_grad=True)
     
     # Calculate derivative w.r.t. to x[x1, x2, ...]
-    _out_u_theta = torch.sum(u_theta(xr))
+    _out_u_theta = torch.sum(u_theta(xr).squeeze())
     _grad_u_theta = grad(_out_u_theta, xr, create_graph=True)[0]
 
-    _out_phi_eta = torch.sum(phi_eta(xr))
+    _out_phi_eta = torch.sum(phi_eta(xr).squeeze())
     _grad_phi_eta = grad(_out_phi_eta, xr, create_graph=True)[0]
 
     # feed forward
-    _phi_eta = phi_eta(xr)              # comp. graph => loss
-    _u_theta_bdry = u_theta(xb)        # comp. graph => loss
+    _phi_eta = phi_eta(xr).squeeze()              # comp. graph => loss
+    _u_theta_bdry = u_theta(xb).squeeze()        # comp. graph => loss
     
     # >>> PDE-specific: calculate for I >>>
     t1 = torch.sum(_grad_u_theta * _grad_phi_eta , dim=1)    # norm, sum along dimension
@@ -106,5 +106,8 @@ if __name__ == '__main__':
     train(params=PARAMS, 
             g=g, 
             loss_func=loss_all, 
-            device=DEVICE)
+            device=DEVICE,
+        #    valid=True,
+            model_path='./WAN_PoissonDirichlet_2.pt'
+        )
 

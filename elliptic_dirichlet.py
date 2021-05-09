@@ -25,10 +25,10 @@ from train import train
 # >>> global params definition >>> 
 PARAMS = {
     'name': 'EllipticDirichlet',
-    'dim': 10,
+    'dim': 25,
     'left boundary': -1,
     'right boundary': 1,
-    'K_primal': 2,
+    'K_primal': 1,
     'K_adv': 1,
     'lr_primal': 0.015,
     'lr_adv': 0.04,
@@ -106,21 +106,18 @@ def loss_all(xr: torch.Tensor, xb: torch.Tensor, u_theta, phi_eta, alpha, device
         torch.Tensor: (1 x 1)
     """
     # Calculate derivative w.r.t. to x
-    x_copy = deepcopy(xr).requires_grad_(True)
-    x_copy = x_copy.to(device)
+    xr = Variable(xr, requires_grad=True)
     
-    _out_u_theta = u_theta(x_copy).squeeze()       # need val only, (N,1)
-    _out_u_theta.backward( torch.ones(xr.shape[0]).to(device) )   # each point contribute equally
-    _grad_u_theta = x_copy.grad
-    
-    _out_phi_eta = phi_eta(x_copy).squeeze()     # need val only, (N,1)
-    _out_phi_eta.backward( torch.ones(xr.shape[0]).to(device) )   # each point contribute equally
-    _grad_phi_eta = x_copy.grad
-    
+    # Calculate derivative w.r.t. to x[x1, x2, ...]
+    _out_u_theta = torch.sum(u_theta(xr).squeeze())
+    _grad_u_theta = grad(_out_u_theta, xr, create_graph=True)[0]
+
+    _out_phi_eta = torch.sum(phi_eta(xr).squeeze())
+    _grad_phi_eta = grad(_out_phi_eta, xr, create_graph=True)[0]
+
     # feed forward
-    #_u_theta = u_theta(xr)             # comp. graph => loss
-    _phi_eta = phi_eta(xr)              # comp. graph => loss
-    _u_theta_bdry = u_theta(xb)        # comp. graph => loss
+    _phi_eta = phi_eta(xr).squeeze()              # comp. graph => loss
+    _u_theta_bdry = u_theta(xb).squeeze()        # comp. graph => loss
     
     # >>> PDE-specific: calculate for I >>>
     t1 = torch.sum(_grad_u_theta * _grad_phi_eta , dim=1) * a(xr)  # norm, sum along dimension

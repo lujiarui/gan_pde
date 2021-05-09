@@ -11,7 +11,7 @@ import torch
 def sample_xr_xb(Nr, Nb, dim, lbd, rbd):
     xr = float(rbd - lbd) * torch.rand(Nr, dim) + float(lbd)
     # Sample along the boundary
-    xb = float(rbd - lbd) * torch.rand(Nr, dim) + float(lbd)
+    xb = float(rbd - lbd) * torch.rand(Nb, dim) + float(lbd)
     for i in range(Nb):
         j = randint(0, dim - 1)
         val = float(rbd - lbd) * randint(0,1) + float(lbd)
@@ -21,7 +21,7 @@ def sample_xr_xb(Nr, Nb, dim, lbd, rbd):
 def sample_xr_xb_xa(Nr, Nb, Na, dim, lbd, rbd, t0, T, N):
     xr = float(rbd - lbd) * torch.rand(Nr, dim) + float(lbd)
     # Sample along the boundary
-    xb = float(rbd - lbd) * torch.rand(Nr, dim) + float(lbd)
+    xb = float(rbd - lbd) * torch.rand(Nb, dim) + float(lbd)
     for i in range(Nb):
         j = randint(0, dim - 1)
         val = float(rbd - lbd) * randint(0,1) + float(lbd)
@@ -46,24 +46,44 @@ def sample_xr_xb_xa(Nr, Nb, Na, dim, lbd, rbd, t0, T, N):
 
     return xr, xr_t0, xr_T, xb, xa
 
-def plot_func(u_true, u_param, dim):
+def sample_lin(low, high, dim):
+    x = torch.linspace(low, high)   # 100 pts
+    lin = torch.zeros(100*100, dim)
+    for i in range(100*100):
+        lin[i][0] = x[i//100] 
+        lin[i][1] = x[i%100]
+    return lin
+
+def plot_func(u_true, u_param, dim, low, high):
     u_param.eval()
-    h_axis = 100
-    v_axis = 100
+    u_param.to(torch.device('cpu'))
+    h_axis, v_axis = 100, 100
+    lin = torch.linspace(low, high)   # 100 pts
     x = torch.zeros(h_axis * v_axis, dim)
+    for i in range(h_axis * v_axis):
+        x[i][0] = lin[i//h_axis] 
+        x[i][1] = lin[i%v_axis]
 
-    for i in range(h_axis):
-        for j in range(v_axis):
-            x[i * h_axis + j][0] = float(j) / v_axis    # x0 (h)
-            x[i * h_axis + j][1] = 1. - float(i) / h_axis    # x1 (v)
     _u_true = u_true(x)     # 10000 * 1
-    _u_param = u_param(x)   # 10000 * 1
+    _u_param = u_param(x).squeeze().detach()   # 10000 * 1
     dist = torch.abs(_u_true - _u_param)
+    
     grid = dist.view(h_axis, v_axis).numpy()
-    ax = sns.heatmap(grid)
-    fig = ax.get_figure()
-    fig.savefig('diff.png')
+    ax_dist = sns.heatmap(grid)
+    fig_dist = ax_dist.get_figure()
+    fig_dist.savefig('diff.png')
 
+    grid = _u_true.view(h_axis, v_axis).numpy()
+    ax_true = sns.heatmap(grid)
+    fig_true = ax_true.get_figure()
+    fig_true.savefig('u_true.png')
+
+    grid = _u_param.view(h_axis, v_axis).numpy()
+    ax_param = sns.heatmap(grid)
+    fig_param = ax_param.get_figure()
+    fig_param.savefig('u_param.png')
+
+    
 
 
 def plot_moving(data, desc, log_y=True):
