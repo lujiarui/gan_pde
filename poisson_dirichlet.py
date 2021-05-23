@@ -89,10 +89,10 @@ def loss_all(xr: torch.Tensor, xb: torch.Tensor, u_theta, phi_eta, alpha, device
     _phi_eta = phi_eta(xr).squeeze()              # comp. graph => loss
     _u_theta_bdry = u_theta(xb).squeeze()        # comp. graph => loss
     
-    # >>> PDE-specific: calculate for I >>>
+    # >>> PDE-specific: calculate for I (integrand) >>>
     t1 = torch.sum(_grad_u_theta * _grad_phi_eta , dim=1)    # norm, sum along dimension
     I = t1 - f(xr) * _phi_eta
-    # <<< PDE-specific: calculate for I <<<
+    # <<< PDE-specific: calculate for I (integrand) <<<
 
     loss_int = 2 * torch.log(I.norm()) - torch.log( _phi_eta.norm()**2 )
     loss_bdry = (_u_theta_bdry - g(xb)).norm()**2  / xb.shape[0]
