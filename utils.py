@@ -1,5 +1,5 @@
 import sys, os
-from random import randint
+from random import randint, sample
 import json
 from tqdm import tqdm
 import numpy as np
@@ -47,41 +47,58 @@ def sample_xr_xb_xa(Nr, Nb, Na, dim, lbd, rbd, t0, T, N):
     return xr, xr_t0, xr_T, xb, xa
 
 def sample_lin(low, high, dim):
-    x = torch.linspace(low, high)   # 100 pts
-    lin = torch.zeros(100*100, dim)
-    for i in range(100*100):
-        lin[i][0] = x[i//100] 
-        lin[i][1] = x[i%100]
-    return lin
+    lin = torch.linspace(low, high)   # 100 pts by default
+    if dim == 1:
+        grid_size = 100
+        x = torch.zeros(grid_size, dim)
+        for i in range(100):
+            x[i][0] = lin[i%100] 
+    else:   # only show the first two dimension
+        h_axis, v_axis = 100, 100
+        x = torch.zeros(h_axis * v_axis, dim)
+        for i in range(h_axis * v_axis):
+            x[i][0] = lin[i//h_axis] 
+            x[i][1] = lin[i%v_axis]
+    return x
 
 def plot_func(u_true, u_param, dim, low, high):
+    
+    x = sample_lin(low, high, dim)
     u_param.eval()
     u_param.to(torch.device('cpu'))
-    h_axis, v_axis = 100, 100
-    lin = torch.linspace(low, high)   # 100 pts
-    x = torch.zeros(h_axis * v_axis, dim)
-    for i in range(h_axis * v_axis):
-        x[i][0] = lin[i//h_axis] 
-        x[i][1] = lin[i%v_axis]
-
     _u_true = u_true(x)     # 10000 * 1
     _u_param = u_param(x).squeeze().detach()   # 10000 * 1
     dist = torch.abs(_u_true - _u_param)
     
-    grid = dist.view(h_axis, v_axis).numpy()
-    ax_dist = sns.heatmap(grid)
-    fig_dist = ax_dist.get_figure()
-    fig_dist.savefig('diff.png')
 
-    grid = _u_true.view(h_axis, v_axis).numpy()
-    ax_true = sns.heatmap(grid)
-    fig_true = ax_true.get_figure()
-    fig_true.savefig('u_true.png')
+    if dim == 1:
+        fig, ax = plt.subplots()
+        ax.set_xlim([low, high])
+        # true function plot
+        u_true_grid = _u_true.numpy()
+        # parameterized function plot
+        u_param_grid = _u_param.numpy()
 
-    grid = _u_param.view(h_axis, v_axis).numpy()
-    ax_param = sns.heatmap(grid)
-    fig_param = ax_param.get_figure()
-    fig_param.savefig('u_param.png')
+        sns.lineplot(u_true_grid, ax=ax)
+        sns.lineplot(u_param_grid, ax=ax)
+        fig.savefig('u_true_param.png')
+
+
+    else:    
+        grid = dist.view(h_axis, v_axis).numpy()
+        ax_dist = sns.heatmap(grid)
+        fig_dist = ax_dist.get_figure()
+        fig_dist.savefig('diff.png')
+
+        grid = _u_true.view(h_axis, v_axis).numpy()
+        ax_true = sns.heatmap(grid)
+        fig_true = ax_true.get_figure()
+        fig_true.savefig('u_true.png')
+
+        grid = _u_param.view(h_axis, v_axis).numpy()
+        ax_param = sns.heatmap(grid)
+        fig_param = ax_param.get_figure()
+        fig_param.savefig('u_param.png')
 
     
 

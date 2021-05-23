@@ -67,8 +67,10 @@ def g(x):
     """ 
     :g Dirichlet boundary / ground truth weak solution
     """
-    _g0_m1 = g0(-1)
-    _g0_1 = g0(1)
+    _m1 = torch.Tensor([-1.])
+    _1 = torch.Tensor([1.])
+    _g0_m1 = g0(_m1)
+    _g0_1 = g0(_1)
     c0 = -(_g0_m1 + _g0_1) / 2
     c1 = (_g0_m1 - _g0_1) / 2
     return g0(x) + c1 * x + c0
@@ -114,6 +116,7 @@ def loss_all(xr: torch.Tensor, xb: torch.Tensor, u_theta, phi_eta, alpha, device
 
 
 if __name__ == '__main__':
+    print('Use device: ', DEVICE)
     train(params=PARAMS, 
             g=g, 
             loss_func=loss_all, 
