@@ -36,7 +36,7 @@ class PrimalNet(nn.Module):
 
 # >>> Adversarial Network >>>
 class AdverNet(nn.Module):
-    def __init__(self, in_dim, hidden_dim=50, out_dim=1, n_hidden=8):
+    def __init__(self, in_dim, hidden_dim=50, out_dim=1, n_hidden=2):
         super().__init__()
         self.in_layer = nn.Linear(in_dim, hidden_dim)
         self.linears = nn.ModuleList([

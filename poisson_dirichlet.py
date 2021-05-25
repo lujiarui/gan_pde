@@ -30,13 +30,13 @@ PARAMS = {
     'right boundary': 1,
     'K_primal': 1,
     'K_adv': 1,
-    'lr_primal': 0.015,
-    'lr_adv': 0.04,
+    'lr_primal': 0.001,
+    'lr_adv': 0.02,
     'Nr': 10000,
-    'Nb': 400,
+    'Nb': 100,
     'alpha': None,
     'use elu': True,
-    'n_iter': 5000,
+    'n_iter': 20000,
 }
 PARAMS['alpha'] = PARAMS['Nb'] * 10000
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -79,19 +79,25 @@ def loss_all(xr: torch.Tensor, xb: torch.Tensor, u_theta, phi_eta, alpha, device
     xr = Variable(xr, requires_grad=True)
     
     # Calculate derivative w.r.t. to x[x1, x2, ...]
-    _out_u_theta = torch.sum(u_theta(xr).squeeze())
+    _u_theta = u_theta(xr).squeeze()
+    _out_u_theta = torch.sum(_u_theta)
     _grad_u_theta = grad(_out_u_theta, xr, create_graph=True)[0]
-
-    _out_phi_eta = torch.sum(phi_eta(xr).squeeze())
-    _grad_phi_eta = grad(_out_phi_eta, xr, create_graph=True)[0]
 
     # feed forward
     _phi_eta = phi_eta(xr).squeeze()              # comp. graph => loss
     _u_theta_bdry = u_theta(xb).squeeze()        # comp. graph => loss
-    
+
+    _out_phi_eta = torch.sum(_phi_eta)
+    _grad_phi_eta = grad(_out_phi_eta, xr, create_graph=True)[0]
+
     # >>> PDE-specific: calculate for I (integrand) >>>
-    t1 = torch.sum(_grad_u_theta * _grad_phi_eta , dim=1)    # norm, sum along dimension
-    I = t1 - f(xr) * _phi_eta
+    #t1 = torch.sum(_grad_u_theta * _grad_phi_eta , dim=1)    # norm, sum along dimension
+    t1_list = []
+    for i in range(xr.shape[1]):
+        for j in range(xr.shape[1]):
+            t1_list.append(_grad_u_theta[:, i] * _grad_phi_eta[:, j])
+
+    I = sum(t1_list) - f(xr) * _phi_eta
     # <<< PDE-specific: calculate for I (integrand) <<<
 
     loss_int = 2 * torch.log(I.norm()) - torch.log( _phi_eta.norm()**2 )
@@ -108,6 +114,6 @@ if __name__ == '__main__':
             loss_func=loss_all, 
             device=DEVICE,
         #    valid=True,
-            model_path='./WAN_PoissonDirichlet_2.pt'
+        #    model_path='./poisson/WAN_PoissonDirichlet_2.pt'
         )
 

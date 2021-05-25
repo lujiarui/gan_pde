@@ -25,7 +25,7 @@ from train import train
 # >>> global params definition >>> 
 PARAMS = {
     'name': 'EllipticDirichlet',
-    'dim': 25,
+    'dim': 20,
     'left boundary': -1,
     'right boundary': 1,
     'K_primal': 1,
@@ -41,7 +41,8 @@ PARAMS = {
 # update 
 PARAMS['Nr'] = PARAMS['dim'] * 4000
 PARAMS['Nb'] = PARAMS['dim'] * PARAMS['dim'] * 40
-PARAMS['alpha'] = PARAMS['Nb'] * 10000
+
+PARAMS['alpha'] = PARAMS['Nb'] * 20000
 
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 # <<< global params definition <<<
@@ -120,12 +121,17 @@ def loss_all(xr: torch.Tensor, xb: torch.Tensor, u_theta, phi_eta, alpha, device
     _u_theta_bdry = u_theta(xb).squeeze()        # comp. graph => loss
     
     # >>> PDE-specific: calculate for I (integrand) >>>
-    t1 = torch.sum(_grad_u_theta * _grad_phi_eta , dim=1) * a(xr)  # norm, sum along dimension
+    #t1 = torch.sum(_grad_u_theta * _grad_phi_eta , dim=1) * a(xr)  # norm, sum along dimension
+    t1_list = []
+    for i in range(xr.shape[1]):
+        for j in range(xr.shape[1]):
+            t1_list.append(_grad_u_theta[:, i] * _grad_phi_eta[:, j] * a(xr))
+
     t2 = torch.sum(_grad_u_theta * _grad_u_theta, dim=1) / 2.0
-    I = (t2 - f(xr)) * _phi_eta - t1
+    I = (t2 - f(xr)) * _phi_eta - sum(t1_list)
     # <<< PDE-specific: calculate for I (integrand) <<<
 
-    loss_int = 2 * torch.log(I.norm()) - torch.log( _phi_eta.norm()**2 )
+    loss_int = 2 * (torch.log(I.norm()) - torch.log(_phi_eta.norm()))
     loss_bdry = (_u_theta_bdry - g(xb)).norm()**2  / xb.shape[0]
     
     return loss_int + loss_bdry * alpha
