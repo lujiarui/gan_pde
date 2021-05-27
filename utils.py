@@ -73,7 +73,7 @@ def plot_func(u_true, u_param, dim, low, high, dirs='.'):
 
     x = x.squeeze().numpy()
     
-    if dim == 1:
+    if dim == 1:    # single-variable function plot
         fig, ax = plt.subplots()
         ax.set_xlim([low, high])
         # true function plot
@@ -97,18 +97,28 @@ def plot_func(u_true, u_param, dim, low, high, dirs='.'):
         data = pd.DataFrame(grid, columns=xticks, index=yticks)
         fig, ax = plt.subplots()
         sns.heatmap(data, ax=ax)
+        # text
+        plt.xlabel('x1')
+        plt.ylabel('x2')
         fig.savefig(os.path.join(dirs,'diff.png'))
+
 
         grid = _u_true.view(h_axis, v_axis).numpy()
         data = pd.DataFrame(grid, columns=xticks, index=yticks)
         fig, ax = plt.subplots()
         sns.heatmap(data, ax=ax)
+        # text
+        plt.xlabel('x1')
+        plt.ylabel('x2')
         fig.savefig(os.path.join(dirs,'u_true.png'))
 
         grid = _u_param.view(h_axis, v_axis).numpy()
         data = pd.DataFrame(grid, columns=xticks, index=yticks)
         fig, ax = plt.subplots()
         sns.heatmap(data, ax=ax)
+        # text
+        plt.xlabel('x1')
+        plt.ylabel('x2')
         fig.savefig(os.path.join(dirs,'u_param.png'))
 
     
@@ -118,8 +128,11 @@ def plot_moving(data, desc, log_y=True):
     if log_y:
         plt.axes(yscale = "log")
     plt.plot(data)
-    plt.ylabel('Moving {} each training episodes'.format(desc))
-    plt.xlabel('Iters')
+    # text for figure
+    plt.title('Moving {} each training episodes'.format(desc))
+    plt.ylabel('Moving {}'.format(desc))
+    plt.xlabel('Epoch')
+
     plt.savefig('moving_{}.png'.format(desc))
     plt.close()
 

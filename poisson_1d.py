@@ -25,20 +25,21 @@ from train import train
 # >>> global params definition >>> 
 PARAMS = {
     'name': 'Poisson_1d',
-    'dim': 1,
+    'dim': 2,
     'left boundary': -1,
     'right boundary': 1,
     'K_primal': 1,
     'K_adv': 1,
-    'lr_primal': 0.005,
-    'lr_adv': 0.15,
-    'Nr': 5000,
-    'Nb': 100,
-    'alpha': 1.,
+    'lr_primal': 1e-1,
+    'lr_adv': 3e-1,
+    'Nr': 10000,
+    'Nb': 400,
+    'alpha': None,
     'use elu': True,
     'n_iter': 20000,
 }
-#PARAMS['alpha'] = PARAMS['Nb'] * 1000
+
+PARAMS['alpha'] = PARAMS['Nb'] * 10000
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 # <<< global params definition <<<
 
@@ -54,31 +55,30 @@ def g(x):
     """
     R.H.S of PDE
     """
-    return torch.sin(x) + 4. * torch.sin(4. * x) - 8. * torch.sin(8. * x) + 16. * torch.sin(24. * x)
+    return torch.sin(x[:,0]) + 4. * torch.sin(4. * x[:,0]) - 8. * torch.sin(8. * x[:,0]) + 16. * torch.sin(24. * x[:,0])
 
 def g0(x):
     """
     :g_0 a component of grount truth solution
     """
-    return torch.sin(x) + torch.sin(4. * x) / 4. - torch.sin(8. * x) / 8. + torch.sin(24. * x) / 36.
+    return torch.sin(x[:,0]) + torch.sin(4. * x[:,0]) / 4. - torch.sin(8. * x[:,0]) / 8. + torch.sin(24. * x[:,0]) / 36.
     
 
 def u(x):
-    """ 
+    """
     :u Dirichlet boundary / ground truth weak solution
     """
     _device = x.device
-    _m1 = torch.Tensor([-1.]).to(_device)
-    _1 = torch.Tensor([1.]).to(_device)
+    _m1 = torch.Tensor([-1.]).reshape(1,1).to(_device)
+    _1 = torch.Tensor([1.]).reshape(1,1).to(_device)
     _g0_m1 = g0(_m1)
     _g0_1 = g0(_1)
     c0 = -(_g0_m1 + _g0_1) / 2.
     c1 = (_g0_m1 - _g0_1) / 2.
-    return g0(x) + c1 * x + c0  # broadcast
+    return g0(x) + c1 * x[:,0] + c0  # broadcast
 
 
 # -----------------------------------------------------------------------------------------
-
 def loss_all(xr: torch.Tensor, xb: torch.Tensor, u_theta, phi_eta, alpha, device):
     """
     Args:
@@ -91,6 +91,47 @@ def loss_all(xr: torch.Tensor, xb: torch.Tensor, u_theta, phi_eta, alpha, device
         torch.Tensor: (1 x 1)
     """
 
+
+    # Calculate derivative w.r.t. to x
+    xr = Variable(xr, requires_grad=True)
+    
+    # Calculate derivative w.r.t. to x[x1, x2, ...]
+    _u_theta = u_theta(xr).squeeze()
+    _out_u_theta = torch.sum(_u_theta)
+    _grad_u_theta = grad(_out_u_theta, xr, create_graph=True)[0]
+
+    # feed forward
+    _phi_eta = phi_eta(xr).squeeze()              # comp. graph => loss
+    _u_theta_bdry = u_theta(xb).squeeze()        # comp. graph => loss
+
+    _out_phi_eta = torch.sum(_phi_eta)
+    _grad_phi_eta = grad(_out_phi_eta, xr, create_graph=True)[0]
+
+    # >>> PDE-specific: calculate for I (integrand) >>>
+    t1_list = []
+    for i in range(xr.shape[1]):
+        for j in range(xr.shape[1]):
+            t1_list.append(_grad_u_theta[:, i] * _grad_phi_eta[:, j])
+
+    I = sum(t1_list) - g(xr) * _phi_eta
+    # <<< PDE-specific: calculate for I (integrand) <<<
+
+    loss_int = 2 * (torch.log(I.norm()) - torch.log(_phi_eta.norm()) )
+    loss_bdry = (_u_theta_bdry - 0.).norm()**2  / xb.shape[0]
+    
+    return loss_int + loss_bdry * alpha
+
+def _loss_all(xr: torch.Tensor, xb: torch.Tensor, u_theta, phi_eta, alpha, device):
+    """
+    Args:
+        torch.Tensor: (Nr x d)
+        torch.Tensor: (Nb x d)
+        Network instance
+        Network instance
+        alpha: weight constant
+    Returns:
+        torch.Tensor: (1 x 1)
+    """
 
     # Calculate derivative w.r.t. to x
     xr = Variable(xr, requires_grad=True)
@@ -112,7 +153,7 @@ def loss_all(xr: torch.Tensor, xb: torch.Tensor, u_theta, phi_eta, alpha, device
     I = t1 - g(xr) * _phi_eta
     # <<< PDE-specific: calculate for I (integrand) <<<
 
-    loss_int = 2 * (torch.log(I.norm()) - torch.log(_phi_eta.norm()))
+    loss_int = 2. * (torch.log(I.norm()) - torch.log(_phi_eta.norm()))
     loss_bdry = (_u_theta_bdry - 0.).norm()**2  / xb.shape[0]
     
     return loss_int + loss_bdry * alpha

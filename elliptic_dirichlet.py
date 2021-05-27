@@ -30,13 +30,13 @@ PARAMS = {
     'right boundary': 1,
     'K_primal': 1,
     'K_adv': 1,
-    'lr_primal': 0.015,
-    'lr_adv': 0.04,
+    'lr_primal': 0.0015,
+    'lr_adv': 0.004,
     'Nr': None,
     'Nb': None,
     'alpha': None,
     'use elu': False,
-    'n_iter': 20000,
+    'n_iter': 3000,
 }
 # update 
 PARAMS['Nr'] = PARAMS['dim'] * 4000

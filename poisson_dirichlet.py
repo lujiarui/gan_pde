@@ -30,13 +30,13 @@ PARAMS = {
     'right boundary': 1,
     'K_primal': 1,
     'K_adv': 1,
-    'lr_primal': 0.001,
-    'lr_adv': 0.02,
-    'Nr': 10000,
-    'Nb': 100,
+    'lr_primal': 0.0015,
+    'lr_adv': 0.004,
+    'Nr': 10000,  # 10000
+    'Nb': 400,
     'alpha': None,
     'use elu': True,
-    'n_iter': 20000,
+    'n_iter': 3000,
 }
 PARAMS['alpha'] = PARAMS['Nb'] * 10000
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -91,7 +91,6 @@ def loss_all(xr: torch.Tensor, xb: torch.Tensor, u_theta, phi_eta, alpha, device
     _grad_phi_eta = grad(_out_phi_eta, xr, create_graph=True)[0]
 
     # >>> PDE-specific: calculate for I (integrand) >>>
-    #t1 = torch.sum(_grad_u_theta * _grad_phi_eta , dim=1)    # norm, sum along dimension
     t1_list = []
     for i in range(xr.shape[1]):
         for j in range(xr.shape[1]):
@@ -100,7 +99,7 @@ def loss_all(xr: torch.Tensor, xb: torch.Tensor, u_theta, phi_eta, alpha, device
     I = sum(t1_list) - f(xr) * _phi_eta
     # <<< PDE-specific: calculate for I (integrand) <<<
 
-    loss_int = 2 * torch.log(I.norm()) - torch.log( _phi_eta.norm()**2 )
+    loss_int = 2 * (torch.log(I.norm()) - torch.log(_phi_eta.norm()) )
     loss_bdry = (_u_theta_bdry - g(xb)).norm()**2  / xb.shape[0]
     
     return loss_int + loss_bdry * alpha
